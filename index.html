@@ -1,0 +1,515 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>optparse &#8212; optparse 0.3 documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="nav-item nav-item-0"><a href="#">optparse 0.3 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="optparse">
+<h1>optparse<a class="headerlink" href="#optparse" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Permalink to this headline">¶</a></h2>
+<p>This module provides a generic way of describing and parsing command line
+arguments. Features:</p>
+<ul class="simple">
+<li><p>Supports both short form (“-k”) and long form (“–key”) options.</p></li>
+<li><p>Supports both mandatory and optional positional arguments.</p></li>
+<li><p>Built-in parsers for most common options/argument types.</p></li>
+<li><p>Automatically formats and prints a help string.</p></li>
+<li><p>Supports custom parsers via callbacks.</p></li>
+<li><p>The parser specification is designed to be read-only so it can be
+placed in the .text section of a binary (and in an MCU, into the FLASH).</p></li>
+</ul>
+<div class="section" id="limitations">
+<h3>Limitations<a class="headerlink" href="#limitations" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>There is no way to tell that an option was not specified: options have
+default value and it is generally not possible to tell this value apart
+from a user supplied value.</p></li>
+<li><p>When using custom actions, a character used as a short option key should
+NOT be used as a long option key in another rule or else the user callback
+will not be able to tell them apart (may or may not be an issue.)</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="terminology">
+<h2>Terminology<a class="headerlink" href="#terminology" title="Permalink to this headline">¶</a></h2>
+<dl>
+<dt>option</dt><dd><p>Optional value. Consists of a key an possibly a value. Each type of option
+has a predefined number of arguments it takes that may be either 0 or 1.</p>
+<p>Example: <code class="docutils literal notranslate"><span class="pre">-v</span> <span class="pre">--number</span> <span class="pre">5</span> <span class="pre">-k</span> <span class="pre">hello</span></code></p>
+<p>Options (key, value): (v, none), (number, 5), (k, hello)</p>
+<p>Options are identified by a string (or character) key.</p>
+</dd>
+<dt>switch</dt><dd><p>An option taking 0 values.</p>
+</dd>
+<dt>(positional) argument:</dt><dd><p>A value without a key. For example, in <code class="docutils literal notranslate"><span class="pre">-c</span> <span class="pre">3</span> <span class="pre">abcd</span></code>, abcd is an argument.
+Arguments can be either mandatory or optional and are identified by an
+integer index. Because of this, optional arguments must always come AFTER
+mandatory ones.</p>
+</dd>
+<dt>short-option</dt><dd><p>An option that starts with a single dash and consists of a single character.
+For example <code class="docutils literal notranslate"><span class="pre">-k</span> <span class="pre">78</span></code>, <code class="docutils literal notranslate"><span class="pre">-c</span></code>, <code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">filename</span></code>.</p>
+</dd>
+<dt>long-option</dt><dd><p>An option that starts with two dashes and consists of one or more characters
+(i.e. a string). For example <code class="docutils literal notranslate"><span class="pre">--echo</span></code>, <code class="docutils literal notranslate"><span class="pre">--factor</span> <span class="pre">1.5</span></code>.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>Initialize the required <a class="reference internal" href="#c.structopt__conf" title="structopt__conf"><code class="docutils literal notranslate"><span class="pre">opt_conf</span></code></a> and <a class="reference internal" href="#c.structopt__rule" title="structopt__rule"><code class="docutils literal notranslate"><span class="pre">opt_rule</span></code></a>
+structures and call <a class="reference internal" href="#c.optparse_8h_1ac9915bdd556f923eacfc87676e2afa43" title="optparse_8h_1ac9915bdd556f923eacfc87676e2afa43"><code class="docutils literal notranslate"><span class="pre">optparse.h::optparse_cmd()</span></code></a>.</p>
+<div class="section" id="tips-for-defining-rules">
+<h3>Tips for defining rules<a class="headerlink" href="#tips-for-defining-rules" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic">
+<li><p>Make an enum with the name of the parameters (options and arguments) and
+with a last element marking its length:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">enum</span> <span class="p">{</span><span class="n">HEIGHT</span><span class="p">,</span> <span class="n">WIDTH</span><span class="p">,</span> <span class="n">VERBOSE</span><span class="p">,</span> <span class="n">ETC</span><span class="p">,</span> <span class="o">....</span> <span class="p">,</span> <span class="n">N_PARAMETERS</span>
+</pre></div>
+</div>
+</li>
+<li><p>Declare <code class="docutils literal notranslate"><span class="pre">const</span> <span class="pre">struct</span> <span class="pre">opt_rule</span> <span class="pre">rules[N_PARAMETERS];</span></code></p></li>
+<li><p>Initialize it. If your compiler supports specifying sub-objects in array and
+struct/union initializers, they initializer macros can be used. These
+provide a fail-safe way to construct an array (i.e. they ensure that the
+correct tags and union elements are set:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">const</span> <span class="n">struct</span> <span class="n">opt_rule</span> <span class="n">rules</span><span class="p">[</span><span class="n">N_PARAMETERS</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="p">[</span><span class="n">WIDTH</span><span class="p">]</span> <span class="o">=</span> <span class="n">OPTPARSE_O_INT</span><span class="p">(</span><span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="s2">&quot;width&quot;</span><span class="p">,</span> <span class="mi">640</span><span class="p">,</span> <span class="s2">&quot;Display height in px&quot;</span><span class="p">),</span>
+  <span class="p">[</span><span class="n">HEIGHT</span><span class="p">]</span> <span class="o">=</span> <span class="n">OPTPARSE_O_INT</span><span class="p">(</span><span class="s1">&#39;h&#39;</span><span class="p">,</span> <span class="s2">&quot;height&quot;</span><span class="p">,</span> <span class="mi">480</span><span class="p">,</span> <span class="s2">&quot;Display height in px&quot;</span><span class="p">),</span>
+  <span class="o">...</span> <span class="n">etc</span> <span class="o">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</li>
+<li><p>Declare and initialize an <a class="reference internal" href="#c.structopt__conf" title="structopt__conf"><code class="docutils literal notranslate"><span class="pre">opt_conf</span></code></a> object.</p></li>
+</ol>
+</div>
+</div>
+<div class="section" id="reference">
+<h2>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="c.optparse_8h">
+<h3 class="with-subtitle">optparse.h<a class="headerlink" href="#c.optparse_8h" title="Permalink to this headline">¶</a></h3>
+<p class="section-subtitle">Command-line argument parser. </p>
+<p>
+
+
+</p>
+<dl class="macro">
+<dt id="c.optparse_8h_1a9f7952fce85ebce32d457c26834ab813">
+<code class="sig-name descname"> OPTPARSE_NO_SHORT</code><a class="headerlink" href="#c.optparse_8h_1a9f7952fce85ebce32d457c26834ab813" title="Permalink to this definition">¶</a></dt>
+<dd><div class="highlight-c notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="sc">&#39;\0&#39;</span>
+</pre></div>
+</td></tr></table></div>
+<p>Used to indicate that an option has no short (i.e. single character) variant. </p>
+</dd></dl>
+
+<dl class="macro">
+<dt id="c.optparse_8h_1aa5249915172dd4b172c0e944e6ffef39">
+<code class="sig-name descname"> OPTPARSE_MAX_POSITIONAL</code><a class="headerlink" href="#c.optparse_8h_1aa5249915172dd4b172c0e944e6ffef39" title="Permalink to this definition">¶</a></dt>
+<dd><div class="highlight-c notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="n">UCHAR_MAX</span>
+</pre></div>
+</td></tr></table></div>
+<p>Maximum number of positional arguments supported. </p>
+</dd></dl>
+
+<dl class="macro">
+<dt id="c.optparse_8h_1ae5b615bcd27c4b6aa4fac371b9c38b70">
+<code class="sig-name descname"> OPTPARSE_IGNORE_ARGV0</code><a class="headerlink" href="#c.optparse_8h_1ae5b615bcd27c4b6aa4fac371b9c38b70" title="Permalink to this definition">¶</a></dt>
+<dd><div class="highlight-c notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">OPTPARSE_IGNORE_ARGV0_b</span><span class="p">)</span>
+</pre></div>
+</td></tr></table></div>
+<p>Indicates if argv[0] should be skipped </p>
+</dd></dl>
+
+<dl class="macro">
+<dt id="c.optparse_8h_1ae20446958952faa454a9203246e27b8e">
+<code class="sig-name descname"> OPTPARSE_COLLECT_LAST_POS</code><a class="headerlink" href="#c.optparse_8h_1ae20446958952faa454a9203246e27b8e" title="Permalink to this definition">¶</a></dt>
+<dd><div class="highlight-c notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">OPTPARSE_COLLECT_LAST_POS_b</span><span class="p">)</span>
+</pre></div>
+</td></tr></table></div>
+<p>If this flag is set, the last positional argument rule is applied to all extra positional arguments (i.e. it “collects” them all) </p>
+</dd></dl>
+
+<dl class="macro">
+<dt id="c.group__initializers_1ga82708d22d10afe51749f22c4f6ba6448">
+<code class="sig-name descname"> OPTPARSE_O</code><span class="sig-paren">(</span> <em>type</em>,  <em>short_</em>,  <em>long_</em>,  <em>description</em>,  <em>default_value_</em><span class="sig-paren">)</span><a class="headerlink" href="#c.group__initializers_1ga82708d22d10afe51749f22c4f6ba6448" title="Permalink to this definition">¶</a></dt>
+<dd><div class="highlight-c notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1
+2
+3</pre></div></td><td class="code"><div class="highlight"><pre><span></span>{.action=OPTPARSE_##type, .action_data.option.short_id=(short_), \
+	 .action_data.option.long_id=(long_), .desc=(description), \
+	 .default_value._OPTPARSE_##type##_INIT = (default_value_)}
+</pre></div>
+</td></tr></table></div>
+<p>Declare an option.</p>
+<p>type must be a member of OPTPARSE_ACTIONS, with the “OPTPARSE_” prefix removed. For example:</p>
+<p>OPTPARSE_O(SET_BOOL, ‘s’, “set”, “Set a flag ‘s’”, false) </p>
+</dd></dl>
+
+<dl class="macro">
+<dt id="c.group__initializers_1ga771f3cdc508e51ae29817d704f89eba2">
+<code class="sig-name descname"> OPTPARSE_P</code><span class="sig-paren">(</span> <em>type</em>,  <em>name</em>,  <em>description</em>,  <em>default_value</em><span class="sig-paren">)</span><a class="headerlink" href="#c.group__initializers_1ga771f3cdc508e51ae29817d704f89eba2" title="Permalink to this definition">¶</a></dt>
+<dd><div class="highlight-c notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="n">_OPTPARSE_P</span><span class="p">(</span><span class="n">OPTPARSE_POSITIONAL</span><span class="p">,</span> <span class="n">type</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">default_value</span><span class="p">)</span>
+</pre></div>
+</td></tr></table></div>
+<p>Declare a mandatory positional argument.</p>
+<p>type must be a member of OPTPARSE_POS_ACTIONS, with the “OPTPARSE_POS” prefix removed. For example:</p>
+<p>OPTPARSE_P(STR_NOCOPY, “filename”, “Output file”, “whatever.out”) </p>
+</dd></dl>
+
+<dl class="macro">
+<dt id="c.group__initializers_1ga7aaed62928822d25632f5032eaeec9e5">
+<code class="sig-name descname"> OPTPARSE_P_OPT</code><span class="sig-paren">(</span> <em>type</em>,  <em>name</em>,  <em>description</em>,  <em>default_value</em><span class="sig-paren">)</span><a class="headerlink" href="#c.group__initializers_1ga7aaed62928822d25632f5032eaeec9e5" title="Permalink to this definition">¶</a></dt>
+<dd><div class="highlight-c notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="n">_OPTPARSE_P</span><span class="p">(</span><span class="n">OPTPARSE_POSITIONAL_OPT</span><span class="p">,</span> <span class="n">type</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">default_value</span><span class="p">)</span>
+</pre></div>
+</td></tr></table></div>
+<p>Declare an optional positional argument.</p>
+<p>Like OPTPARSE_P, but it is not an error if the argument is missing. Remember that optional arguments MUST come after mandatory ones on the <a class="reference internal" href="#c.structopt__conf_1aef3beb3a9e3faf0c5b2633f962811912" title="structopt__conf_1aef3beb3a9e3faf0c5b2633f962811912"><code class="docutils literal notranslate"><span class="pre">optparse.h::opt_conf::rules</span></code></a> array. </p>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abd">
+<!--[c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abd]-->enum<code class="sig-name descname"> OPTPARSE_RESULT</code><a class="headerlink" href="#c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abd" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="simple">
+<dt id="c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abdab12bd288b64623f26cc56072619eb80e">OPTPARSE_OK</dt><dd><p>Parsing suceeded </p>
+</dd>
+<dt id="c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abda27c1bfa6b035893c78824933c44fe173">OPTPARSE_NOMEM</dt><dd><p>Not enough memory. Only OPTPARSE_STR or a custom parser may cause this error. </p>
+</dd>
+<dt id="c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abda22dee3b61dbbe03896266543679f0446">OPTPARSE_BADSYNTAX</dt><dd><p>Command line is wrongly formed </p>
+</dd>
+<dt id="c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abda883724f8b7df593c7f3b1e3e03d42880">OPTPARSE_BADCONFIG</dt><dd><p>The parser configuration is invalid. </p>
+</dd>
+<dt id="c.optparse_8h_1a50473dad91d6f0f107083bcbc9592abda86761ce1151733763ee7bbf64ee53b25">OPTPARSE_REQHELP</dt><dd><p>The help option was requested. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4">
+<!--[c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4]-->enum<code class="sig-name descname"> OPTPARSE_ACTIONS</code><a class="headerlink" href="#c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4" title="Permalink to this definition">¶</a></dt>
+<dd><dl>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a96730a8a343fdfdba3bb5460b15da219">OPTPARSE_IGNORE</dt><dd><p>Ignore a key and its value. Takes 1 argument. </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a64daff98768f2141e4c4929a36c338b5">OPTPARSE_CUSTOM_ACTION</dt><dd><p>Delegate the action to a callback. int _thin_callback(union <a class="reference internal" href="#c.unionopt__key" title="unionopt__key">opt_key</a> key, const char *value, union <a class="reference internal" href="#c.unionopt__data" title="unionopt__data">opt_data</a> *data, const char **msg) </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a0308cadd5946b80fc6106babd3f07760">OPTPARSE_UINT</dt><dd><p>Parse the value as an unsigned int and store it in opt_data::d_uint </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4aea00d30e36dc074a3a8b48dbace950f1">OPTPARSE_INT</dt><dd><p>Parse the value as an int and store it in opt_data::d_int </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4aa30e599d0d4f7f104cc73668a7975bf8">OPTPARSE_FLOAT</dt><dd><p>Parse the value as float and store it in opt_data::d_float </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4aec061b8679036d2c98c52bc252ca0011">OPTPARSE_STR</dt><dd><p>Make a copy of the value string with strdup() and place it in data::d_str. The string must be deallocated with free(). </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4ad9e100fed18e836b4fab57bc569b1b40">OPTPARSE_STR_NOCOPY</dt><dd><p>Place a pointer to the value string in data::d_cstr.</p>
+<p>In contrast with OPTPARSE_STR, this does NOT make a copy of the string. It should not be used if the strings will be modified. </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a63f82b71e0455f9a0d2cea0f7d113c8d">OPTPARSE_IGNORE_SWITCH <code class="code docutils literal notranslate"><span class="pre">=_OPTPARSE_MAX_NEEDS_VALUE_END</span></code></dt><dd><p>Ignore a switch. Takes 0 arguments </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4ad5e1d31e92ce24ab6d93f0c25ae119cf">OPTPARSE_SET_BOOL</dt><dd><p>Set opt_data::d_bool to true. Takes 0 arguments. </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a84055e5d47ac2a9f41afe29b7f7fc336">OPTPARSE_UNSET_BOOL</dt><dd><p>Set opt_data::d_bool to false. Takes 0 arguments. </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a5a9ecd8aabf5b438c7e81552ff4566a3">OPTPARSE_COUNT</dt><dd><p>Count the number of occurences. Increments data::d_int each time the option is found. </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4ab747d85737e1c9bccd4aff491fe28492">OPTPARSE_DO_HELP</dt><dd><p>Print the following strings, except if they are NULL:<ul class="simple">
+<li><p><a class="reference internal" href="#c.structopt__conf_1a80307c3dbfe808337967e62abce79bc4" title="structopt__conf_1a80307c3dbfe808337967e62abce79bc4"><code class="docutils literal notranslate"><span class="pre">optparse.h::opt_conf::helpstr</span></code></a></p></li>
+<li><p>For each element of opt_conf::opt_rule:<ul>
+<li><p>short_id (tab) long_id (tab) desc</p></li>
+</ul>
+
+</p></li>
+</ul>
+
+</p>
+<p>In addition it causes the parser to exit with code OPTPARSE_REQHELP. </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a7326b5347e68fa31da7fead761bbaded">OPTPARSE_POSITIONAL <code class="code docutils literal notranslate"><span class="pre">=_OPTPARSE_POSITIONAL_START</span></code></dt><dd><p>Indicates that the rule is a mandatory positional argument and not an option. </p>
+</dd>
+<dt id="c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4a0f3301e808cb4261a31cf36fbc56472c">OPTPARSE_POSITIONAL_OPT</dt><dd><p>Indicates that the rule is an optional positional argument and not an option. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627">
+<!--[c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627]-->enum<code class="sig-name descname"> OPTPARSE_POSITIONAL_ACTIONS</code><a class="headerlink" href="#c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="simple">
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627ab68d87269834672602d91ec750957d1c">OPTPARSE_POS_IGNORE <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_IGNORE</span></code></dt><dd></dd>
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627aa83aba94ecc800239c317d5e477ea9cd">OPTPARSE_POS_COUNT <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_COUNT</span></code></dt><dd></dd>
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627ab92d0a67b0bdacfbdc34b15984ee330f">OPTPARSE_POS_CUSTOM_ACTION <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_CUSTOM_ACTION</span></code></dt><dd></dd>
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627a3292a91bdba4cf265bec15deff1d16c3">OPTPARSE_POS_UINT <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_UINT</span></code></dt><dd></dd>
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627acc5980e62787c3a2b35e72149a89e5f1">OPTPARSE_POS_INT <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_INT</span></code></dt><dd></dd>
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627a7475ea46ce01147053bd3e84de1e6c14">OPTPARSE_POS_FLOAT <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_FLOAT</span></code></dt><dd></dd>
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627a79c05a0923fbbb60d13b3ec2a4383e8d">OPTPARSE_POS_STR <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_STR</span></code></dt><dd></dd>
+<dt id="c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627a9554c4ad0af638cfb675e583230847c1">OPTPARSE_POS_STR_NOCOPY <code class="code docutils literal notranslate"><span class="pre">=</span> <span class="pre">OPTPARSE_STR_NOCOPY</span></code></dt><dd></dd>
+</dl>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.optparse_8h_1aabd834abf73db5b0ca580df4b6605766">
+<!--[c.optparse_8h_1aabd834abf73db5b0ca580df4b6605766]-->enum<code class="sig-name descname"> OPTPARSE_TUNABLES</code><a class="headerlink" href="#c.optparse_8h_1aabd834abf73db5b0ca580df4b6605766" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="simple">
+<dt id="c.optparse_8h_1aabd834abf73db5b0ca580df4b6605766a8a90d7602889d771dbdcaca71f36f06f">OPTPARSE_IGNORE_ARGV0_b</dt><dd></dd>
+<dt id="c.optparse_8h_1aabd834abf73db5b0ca580df4b6605766a9d0e9754ee57e61ff2547b79fb834d01">OPTPARSE_COLLECT_LAST_POS_b</dt><dd></dd>
+</dl>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.optparse_8h_1a1bf9e1a3fa55bdc8c7c9fe04570cc565">
+uint16_t<code class="sig-name descname"> optparse_tune</code><a class="headerlink" href="#c.optparse_8h_1a1bf9e1a3fa55bdc8c7c9fe04570cc565" title="Permalink to this definition">¶</a></dt>
+<dd><p>Option bitfield </p>
+</dd></dl>
+
+<dl class="function">
+<dt id="c.optparse_8h_1ac9915bdd556f923eacfc87676e2afa43">
+int<code class="sig-name descname"> optparse_cmd</code><span class="sig-paren">(</span>const struct <a class="reference internal" href="#c.structopt__conf" title="structopt__conf">opt_conf</a> * <em>config</em>, union <a class="reference internal" href="#c.unionopt__data" title="unionopt__data">opt_data</a> * <em>result</em>, int <em>argc</em>, const char *const <em>argv</em><span class="sig-paren">)</span><a class="headerlink" href="#c.optparse_8h_1ac9915bdd556f923eacfc87676e2afa43" title="Permalink to this definition">¶</a></dt>
+<dd><p>Main interface to the option parser.</p>
+<p>Short options:</p>
+<p>A short option that takes a value can be immediately followed by the value in the same argv string. For example “-upeter” would assign “peter” to the “u” option.</p>
+<p>Short switches can be merged together like “-xj”.</p>
+<p>Dash handling:</p>
+<p>A double dash () indicates the parser that there are no more options/ switches and all the remaining command line arguments are to be interpreted as positional arguments</p>
+<p>A single dash is interpreted as a positional argument argument.</p>
+<p>Optional positional arguments:</p>
+<p>Optional positional arguments MUST follow mandatory arguments. The n-th optional argument cannot be set if the (n-1)th optional argument is not set.</p>
+<p>
+</p>
+<p class="rubric">Return values</p>
+<ul class="simple">
+<li><p>Number of positional arguments converted on success, or a negative error code from OPTPARSE_RESULT on error. </p></li>
+</ul>
+</dd></dl>
+
+<dl class="function">
+<dt id="c.optparse_8h_1a9773fe68224920719872073a9f06d1b4">
+void<code class="sig-name descname"> optparse_free_strings</code><span class="sig-paren">(</span>const struct <a class="reference internal" href="#c.structopt__conf" title="structopt__conf">opt_conf</a> * <em>config</em>, union <a class="reference internal" href="#c.unionopt__data" title="unionopt__data">opt_data</a> * <em>result</em><span class="sig-paren">)</span><a class="headerlink" href="#c.optparse_8h_1a9773fe68224920719872073a9f06d1b4" title="Permalink to this definition">¶</a></dt>
+<dd><p>Free all strings allocated by OPTPARSE_STR and OPTPARSE_POS_STR.</p>
+<p>Note that on a parsing error all strings are automatically deallocated.</p>
+<p>This procedure will set all d_str fields to NULL, so it is safe to call it more than once. </p>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.structopt__positionalkey">
+struct<code class="sig-name descname"> opt_positionalkey</code><a class="headerlink" href="#c.structopt__positionalkey" title="Permalink to this definition">¶</a></dt>
+<dd><p>Identify a positional argument. </p>
+<dl class="member">
+<dt id="c.structopt__positionalkey_1ab5faae4477a270d1527cd86ac30fea26">
+unsigned char<code class="sig-name descname"> position</code><a class="headerlink" href="#c.structopt__positionalkey_1ab5faae4477a270d1527cd86ac30fea26" title="Permalink to this definition">¶</a></dt>
+<dd><p>Position (counting from zero) of this argument. Note that options do not contribute to this count. Whether argv[0] is counted depends on the status of OPTPARSE_IGNORE_ARGV0. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__positionalkey_1a7d1aff108c871fcf0507ee2d8b02d3c9">
+const char *<code class="sig-name descname"> name</code><a class="headerlink" href="#c.structopt__positionalkey_1a7d1aff108c871fcf0507ee2d8b02d3c9" title="Permalink to this definition">¶</a></dt>
+<dd><p>User-supplied name of this arguments (from opt_rule_t::name) . </p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="type">
+<dt id="c.unionopt__key">
+union<code class="sig-name descname"> opt_key</code><a class="headerlink" href="#c.unionopt__key" title="Permalink to this definition">¶</a></dt>
+<dd><p>Structure to inform user callbacks of the argument or option being parsed. </p>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.unionopt__data">
+union<code class="sig-name descname"> opt_data</code><a class="headerlink" href="#c.unionopt__data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Value type for options and arguments. </p>
+</dd></dl>
+
+<dl class="type">
+<dt id="c.structopt__rule">
+struct<code class="sig-name descname"> opt_rule</code><a class="headerlink" href="#c.structopt__rule" title="Permalink to this definition">¶</a></dt>
+<dd><p>Configuration rules for a single command line option. </p>
+<dl class="member">
+<dt id="c.structopt__rule_1a0db47d60f12369baa3e1cd03f1184afc">
+enum <a class="reference internal" href="#c.optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4" title="optparse_8h_1a6586e052292fe058c9607fa5a3c0c7c4"><code class="docutils literal notranslate"><span class="pre">optparse.h::OPTPARSE_ACTIONS</span></code></a><code class="sig-name descname"> action</code><a class="headerlink" href="#c.structopt__rule_1a0db47d60f12369baa3e1cd03f1184afc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parsing type/action. See OPTPARSE_ACTIONS. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1afffde9fd4288acb329b4a80a3a1d9b79">
+enum <a class="reference internal" href="#c.optparse_8h_1ab38a9c78fcc0de6faf71939113ada627" title="optparse_8h_1ab38a9c78fcc0de6faf71939113ada627"><code class="docutils literal notranslate"><span class="pre">optparse.h::OPTPARSE_POSITIONAL_ACTIONS</span></code></a><code class="sig-name descname"> pos_action</code><a class="headerlink" href="#c.structopt__rule_1afffde9fd4288acb329b4a80a3a1d9b79" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1aacaed574d5c2ac13af0b2f6ccb2a0ca3">
+const char *<code class="sig-name descname"> name</code><a class="headerlink" href="#c.structopt__rule_1aacaed574d5c2ac13af0b2f6ccb2a0ca3" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1a52c8485d1b8c1a6a564f27b5b451e6f5">
+struct opt_rule::&#64;0::&#64;1<code class="sig-name descname"> argument</code><a class="headerlink" href="#c.structopt__rule_1a52c8485d1b8c1a6a564f27b5b451e6f5" title="Permalink to this definition">¶</a></dt>
+<dd><p>Positional handling specification.</p>
+<p>If the action is OPTPARSE_POSITIONAL or OPTPARSE_POSITIONAL_OPT, this should hold the required action. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1ada9f54a3369ad14bde43844f0301d27e">
+char<code class="sig-name descname"> short_id</code><a class="headerlink" href="#c.structopt__rule_1ada9f54a3369ad14bde43844f0301d27e" title="Permalink to this definition">¶</a></dt>
+<dd><p>Short option name (“-w”), can be OPTPARSE_NO_SHORT. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1a654c7c520ada5aea119e9edfbb9362b4">
+const char *<code class="sig-name descname"> long_id</code><a class="headerlink" href="#c.structopt__rule_1a654c7c520ada5aea119e9edfbb9362b4" title="Permalink to this definition">¶</a></dt>
+<dd><p>Long option name (“–width”), Can be NULL </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1aa8df043451192cf068f7438163f984b4">
+struct opt_rule::&#64;0::opt_optionkey<code class="sig-name descname"> option</code><a class="headerlink" href="#c.structopt__rule_1aa8df043451192cf068f7438163f984b4" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1ac5f7ce8cd55de9dc8ad52d3781066b32">
+union opt_rule::&#64;0<code class="sig-name descname"> action_data</code><a class="headerlink" href="#c.structopt__rule_1ac5f7ce8cd55de9dc8ad52d3781066b32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Keys for options or action type for positional arguments. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1a4eb54f3e0ef21593845aa61344425cfb">
+const char *<code class="sig-name descname"> desc</code><a class="headerlink" href="#c.structopt__rule_1a4eb54f3e0ef21593845aa61344425cfb" title="Permalink to this definition">¶</a></dt>
+<dd><p>Help description. Can be NULL </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__rule_1a3d396bce7ced8d5ad78e14d37c26cd95">
+union <a class="reference internal" href="#c.unionopt__data" title="unionopt__data">opt_data</a><code class="sig-name descname"> default_value</code><a class="headerlink" href="#c.structopt__rule_1a3d396bce7ced8d5ad78e14d37c26cd95" title="Permalink to this definition">¶</a></dt>
+<dd><p>Value for when the option is not given. </p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="type">
+<dt id="c.structopt__conf">
+struct<code class="sig-name descname"> opt_conf</code><a class="headerlink" href="#c.structopt__conf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Configuration for the command line parser. </p>
+<dl class="member">
+<dt id="c.structopt__conf_1a80307c3dbfe808337967e62abce79bc4">
+const char *<code class="sig-name descname"> helpstr</code><a class="headerlink" href="#c.structopt__conf_1a80307c3dbfe808337967e62abce79bc4" title="Permalink to this definition">¶</a></dt>
+<dd><p>Program’s description and general help string. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__conf_1aef3beb3a9e3faf0c5b2633f962811912">
+const struct <a class="reference internal" href="#c.structopt__rule" title="structopt__rule">opt_rule</a> *<code class="sig-name descname"> rules</code><a class="headerlink" href="#c.structopt__conf_1aef3beb3a9e3faf0c5b2633f962811912" title="Permalink to this definition">¶</a></dt>
+<dd><p>Array of options. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__conf_1a3039b82ba4edea01f2cf0d08fc2a31e1">
+int<code class="sig-name descname"> n_rules</code><a class="headerlink" href="#c.structopt__conf_1a3039b82ba4edea01f2cf0d08fc2a31e1" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of elements in rules. </p>
+</dd></dl>
+
+<dl class="member">
+<dt id="c.structopt__conf_1a1322d20a5a0115f144c1782bb564147f">
+<a class="reference internal" href="#c.optparse_8h_1a1bf9e1a3fa55bdc8c7c9fe04570cc565" title="optparse_8h_1a1bf9e1a3fa55bdc8c7c9fe04570cc565"><code class="docutils literal notranslate"><span class="pre">optparse.h::optparse_tune</span></code></a><code class="sig-name descname"> tune</code><a class="headerlink" href="#c.structopt__conf_1a1322d20a5a0115f144c1782bb564147f" title="Permalink to this definition">¶</a></dt>
+<dd><p>Option bitfield. </p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">optparse</a><ul>
+<li><a class="reference internal" href="#summary">Summary</a><ul>
+<li><a class="reference internal" href="#limitations">Limitations</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#terminology">Terminology</a></li>
+<li><a class="reference internal" href="#usage">Usage</a><ul>
+<li><a class="reference internal" href="#tips-for-defining-rules">Tips for defining rules</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#reference">Reference</a><ul>
+<li><a class="reference internal" href="#c.optparse_8h">optparse.h</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="nav-item nav-item-0"><a href="#">optparse 0.3 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Juan I Carrano.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.0.
+    </div>
+  </body>
+</html>
