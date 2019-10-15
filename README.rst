@@ -23,7 +23,7 @@ Features:
 Documentation
 =============
 
-See the header file (proper docs are in the works).
+Type ``make docs`` to build the documentation. Also, look at the header files.
 
 Building and installing
 =======================

@@ -119,3 +119,25 @@ install:
 	rm -rf $(PREFIX)/lib/$(LIBNAME).so
 	ln -s $(OUT_FILE_DYN:$(OUT_DIR_)%=%) $(PREFIX)/lib/$(LIBNAME).so
 	ldconfig -v -n $(PREFIX)/lib
+
+# ---------------------- Handle documentation ----------------------------
+
+SPHINXOPTS    ?=
+SPHINXBUILD   ?= sphinx-build
+DOCS_SRC      ?= doc
+DOCS_SRC_     ?= $(DOCS_SRC)$(PATHSEP)
+DOCS_BUILDDIR ?= $(OUT_DIR_)docs
+XML_BUILDDIR  ?= $(OUT_DIR_)xml
+
+$(XML_BUILDDIR): $(DOCS_SRC_)doxyfile $(SOURCES)
+	OUT_DIR=$(OUT_DIR) SRC=$(SRC) doxygen $< && touch $@
+
+.PHONY: html sphinx-clean docs
+
+html: $(XML_BUILDDIR)
+	@$(SPHINXBUILD) -M $@ "$(DOCS_SRC)" "$(DOCS_BUILDDIR)" $(SPHINXOPTS)
+
+sphinx-clean:
+	@$(SPHINXBUILD) -M clean "$(DOCS_SRC)" "$(DOCS_BUILDDIR)" $(SPHINXOPTS)
+
+docs: html
