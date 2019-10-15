@@ -75,10 +75,11 @@ $(OUT_FILE_DYN): $(OUT_DIR_DYN_)optparse.o | $(OUT_DIR)
 # files end up everywhere.
 
 TEST_PROG = $(OUT_DIR_)test1
+EXAMPLE_PROG = $(OUT_DIR_)readme-example
 
 $(TEST_PROG): OPTFLAGS = -O0
 $(TEST_PROG): DBGFLAGS = --coverage -g3 -dA
-$(TEST_PROG): INCLUDES = -I$(TESTS_)unity -I$(SRC_)
+$(TEST_PROG): INCLUDES = -I$(TESTS_)unity -I$(SRC)
 
 $(TEST_PROG): $(TESTS_)test1.c $(SOURCES)  $(TESTS_)unity$(PATHSEP)unity.c | $(OUT_DIR)
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
@@ -90,8 +91,18 @@ optparse.c.gcov: optparse.gcda
 	gcov -a -k -f optparse
 
 
-.PHONY: test
-test: optparse.c.gcov
+$(EXAMPLE_PROG): INCLUDES = -I$(SRC)
+# use the example to see if the static lib works
+$(EXAMPLE_PROG): $(TESTS_)readme-example.c $(OUT_FILE_STATIC) | $(OUT_DIR)
+	$(CC) $(CFLAGS) $^ -o $@
+
+.PHONY: test example-test
+
+example-test: $(EXAMPLE_PROG)
+	$< -vvsv --cool 90 -- -whatever
+	$< x
+
+test: optparse.c.gcov example-test
 
 .PHONY: clean
 clean:
