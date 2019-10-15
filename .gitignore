@@ -1,0 +1,7 @@
+/build
+*.gcda
+*.gcno
+*.o
+*.gch
+*.a
+*.so
