@@ -19,6 +19,8 @@ Features:
 - No dynamic allocation (unless you want it).
 - Configuration is specified in ``const`` structures & arrays.
 - 3-clause BSD license.
+- The specification of the options/argument is completely separated from the
+  parsing (meaning other formats could be used).
 
 Documentation
 =============
