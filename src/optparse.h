@@ -128,7 +128,9 @@ enum OPTPARSE_ACTIONS {
 
 	/** Indicates that the rule is an optional positional argument and
 	 * not an option. */
-	OPTPARSE_POSITIONAL_OPT
+	OPTPARSE_POSITIONAL_OPT,
+
+	_OPTPARSE_POSITIONAL_END
 };
 
 /**
@@ -287,7 +289,12 @@ typedef uint16_t optparse_tune; /**< Option bitfield */
  */
 struct opt_conf {
 	const char *helpstr; /**< Program's description and general help string. */
-	const struct opt_rule *rules;  /**< Array of options. */
+	/** Array of options.
+	 *
+	 * Optional positional arguments must always come after required ones
+	 * in the rules array.
+	 */
+	const struct opt_rule *rules;
 	int n_rules;              /**< Number of elements in rules. */
 	optparse_tune tune;       /**< Option bitfield. */
 };

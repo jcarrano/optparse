@@ -116,7 +116,8 @@ static bool str_notempty(const char *str)
  */
 static bool _is_argument(enum OPTPARSE_ACTIONS action)
 {
-	return action >= _OPTPARSE_POSITIONAL_START;
+	return action >= _OPTPARSE_POSITIONAL_START
+	       && action < _OPTPARSE_POSITIONAL_END;
 }
 
 /**
@@ -168,9 +169,10 @@ static void do_help(const struct opt_conf *config)
 	}
 }
 
-#ifndef NDEBUG /* avoid unused function warnings */
 /**
  * Check that there are no optional arguments before non optional ones.
+ *
+ * @return zero on success, nonzero on error.
  */
 static bool sanity_check(const struct opt_conf *config)
 {
@@ -186,15 +188,14 @@ static bool sanity_check(const struct opt_conf *config)
 		}
 
 		if (found_optional && !is_optional) {
-			return false;
+			return true;
 		}
 
 		found_optional = found_optional || is_optional;
 	}
 
-	return true;
+	return false;
 }
-#endif
 
 static int do_user_callback(const struct opt_rule *rule, union opt_data *dest,
 			    int positional_idx, const char *value,
@@ -218,6 +219,12 @@ static int do_user_callback(const struct opt_rule *rule, union opt_data *dest,
 	return ret;
 }
 
+static enum OPTPARSE_ACTIONS real_action(const struct opt_rule *rule)
+{
+	return _is_argument(rule->action)? rule->action_data.argument.pos_action
+				         : rule->action;
+}
+
 /**
  * Execute the action associated with an argument.
  *
@@ -234,9 +241,7 @@ static int do_action(const struct opt_rule *rule,
 {
 	int ret = OPTPARSE_OK;
 	char *end_of_conversion;
-	enum OPTPARSE_ACTIONS action = _is_argument(rule->action)?
-				       rule->action_data.argument.pos_action
-				       : rule->action;
+	enum OPTPARSE_ACTIONS action = real_action(rule);
 
 	switch (action) {
 		case OPTPARSE_IGNORE: case OPTPARSE_IGNORE_SWITCH:
@@ -414,12 +419,11 @@ static int assign_default(const struct opt_conf *config,
 
 		if (_is_argument(this_rule->action)) {
 			positional_idx++;
-			action = this_rule->action_data.argument.pos_action;
-		} else {
-			action = this_rule->action;
 		}
 
-		if (config->rules[rule_i].action == OPTPARSE_STR
+		action = real_action(this_rule);
+
+		if (action == OPTPARSE_STR
 		    && this_rule->default_value.d_str != NULL) {
 			result[rule_i].d_str = my_strdup(this_rule->default_value.d_str);
 			if (result[rule_i].d_str == NULL) {
@@ -442,7 +446,7 @@ static int assign_default(const struct opt_conf *config,
 	/* If we exited early, ensure that we do not leave any wild pointer.
 	 * We will have to free them later. */
 	for (; rule_i < config->n_rules; rule_i++) {
-		if (config->rules[rule_i].action == OPTPARSE_STR) {
+		if (real_action(config->rules + rule_i) == OPTPARSE_STR) {
 			result[rule_i].d_str = NULL;
 		}
 	}
@@ -461,7 +465,7 @@ void optparse_free_strings(const struct opt_conf *config, union opt_data *result
 	/* This iteration seems weird but it provides perceptible code size savings
 	 * in both gcc and clang (at least in cortexm/thumb).*/
 	while(i--) {
-		if (this_rule->action == OPTPARSE_STR) {
+		if (real_action(this_rule) == OPTPARSE_STR) {
 			free(result->d_str);
 			result->d_str = NULL;
 		}
@@ -483,7 +487,9 @@ int optparse_cmd(const struct opt_conf *config,
 	const char *pending_opt = NULL;
 
 	/* TODO: remove assert, return badconfig */
-	assert(sanity_check(config));
+	if (sanity_check(config)) {
+		return -OPTPARSE_BADCONFIG;
+	}
 
 	i = (config->tune & OPTPARSE_IGNORE_ARGV0) ? 1 : 0;
 
@@ -495,6 +501,7 @@ int optparse_cmd(const struct opt_conf *config,
 	while (error >= OPTPARSE_OK && i < argc) {
 		const char *key, *value, *msg = NULL;
 		const struct opt_rule *curr_rule = NULL;
+		int positional_idx_delta = 0;
 
 		if (!no_more_options
 		    && ((pending_opt != NULL)
@@ -553,9 +560,9 @@ int optparse_cmd(const struct opt_conf *config,
 		} else {
 			curr_rule = find_arg_rule(config, positional_idx);
 			value = argv[i];
-			positional_idx++;
+			positional_idx_delta = 1;
 
-			if (!positional_idx) { /*check for overflow */
+			if (positional_idx > OPTPARSE_MAX_POSITIONAL) {
 				msg = "Max number of arguments exceeded";
 				error = -OPTPARSE_BADSYNTAX;
 			}
@@ -571,6 +578,8 @@ int optparse_cmd(const struct opt_conf *config,
 					  get_destination(config, curr_rule, result),
 					  positional_idx, value, &msg); /* BYE? */
 		}
+
+		positional_idx += positional_idx_delta;
 
 		if (msg) {
 			P_ERR("%s: %s\n", msg, argv[i]);
